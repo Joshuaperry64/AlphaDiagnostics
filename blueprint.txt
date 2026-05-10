@@ -1,0 +1,129 @@
+Blueprint: Portable, Modular Vehicle Diagnostics Tool
+1. Project Vision
+To create a universal, portable, and modular vehicle diagnostics tool. The system will be capable of interfacing with both modern vehicles via the OBD-II standard and older or simpler vehicles (like a golf cart) through direct sensor connections. The architecture is designed for scalability, allowing for the addition of new vehicles and sensor types in the future.
+Core Components:
+Hub: A Raspberry Pi 5 acting as the central processing unit, data aggregator, and web server.
+Sensor Node(s): One or more ESP32 microcontrollers serving as wireless sensor platforms.
+Interface: A web-based dashboard accessible from any device on the same network.
+--------------------------------------------------------------------------------
+2. System Architecture (Distributed Model)
+The system employs a distributed hub-and-spoke model to maximize flexibility and scalability.
+┌─────────────────────────────────┐
+│   Raspberry Pi 5 (Main Hub)     │
+│   - Python 3.13+                │
+│   - FastAPI Web Server          │
+│   - Mosquitto MQTT Broker       │
+│   - SQLite Database             │
+├─────────────────────────────────┤
+│ ┌──────────────────────────┐    │
+│ │   OBD-II Controller      │    │
+│ │  (python-obd via USB)    │◀───┼─── [2007 Toyota Solara]
+│ └──────────────────────────┘    │
+│ ┌──────────────────────────┐    │
+│ │   MQTT Client/Subscriber │    │
+│ │  (paho-mqtt)             │───▶┼─── [ESP32 Sensor Node]
+│ └──────────────────────────┘    │
+│ ┌──────────────────────────┐    │
+│ │   Data Aggregator & API  │    │
+│ │  (Stores to SQLite)      │    │
+│ └──────────────────────────┘    │
+│ ┌──────────────────────────┐    │
+│ │   WebSocket Server       │───▶┼─── [Web Dashboard Client]
+│ │  (Serves live data)      │    │
+│ └──────────────────────────┘    │
+└─────────────────────────────────┘
+2.1. Communication Protocols
+OBD-II to Hub: Serial communication over USB, using an ELM327 adapter. The python-obd library will handle the protocol abstraction.
+Sensor Node to Hub: MQTT over Wi-Fi. The ESP32 will publish sensor data to topics on the Mosquitto broker running on the Pi. The Pi's Python application will subscribe to these topics.
+Hub to Dashboard: WebSockets for real-time data streaming and a RESTful API (FastAPI) for historical data retrieval.
+--------------------------------------------------------------------------------
+3. Phase 1: Hub Foundation (Raspberry Pi 5)
+3.1. Hardware & OS Setup
+Hardware: Raspberry Pi 5 (8GB recommended), high-speed microSD card (64GB+), official power supply.
+OS: Raspberry Pi OS (64-bit), fully updated.
+Initial Configuration: SSH enabled, Wi-Fi configured, static IP address assigned for reliability.
+3.2. Software Installation
+System Packages:
+Python Environment:
+3.3. File Structure
+/AlphaDiagnostics/
+├── main.py
+├── obd_reader.py
+├── mqtt_client.py
+├── database.py
+├── config.py
+├── requirements.txt
+├── static/
+│   ├── index.html
+│   ├── css/
+│   │   └── styles.css
+│   └── js/
+│       └── app.js
+└── esp32/
+    └── boot.py
+3.4. Module Implementation
+database.py
+Defines SQLAlchemy ORM models.
+Vehicle: Stores vehicle information (e.g., 'Toyota Solara 2007', 'Golf Cart').
+SensorReading: Stores timestamped sensor data, linked to a Vehicle. Includes columns for sensor_name, value, and units.
+Includes a function to initialize the database and create tables.
+config.py
+Stores all configuration variables.
+DATABASE_URL = "sqlite:///./diagnostics.db"
+MQTT_BROKER_ADDRESS = "localhost"
+MQTT_PORT = 1883
+OBD_PORT_STR = "/dev/ttyUSB0" (or auto-detected)
+obd_reader.py
+Contains a class OBDReader that runs in a separate thread.
+Connects to the ELM327 adapter using python-obd.
+Continuously polls a predefined list of OBD commands (RPM, SPEED, COOLANT_TEMP, etc.).
+For each successful reading, it writes the data to the SQLite database via a thread-safe queue or direct call to a database manager function.
+mqtt_client.py
+Contains a class MQTTClient.
+Connects to the local Mosquitto broker.
+Subscribes to relevant topics (e.g., vehicles/golfcart/#).
+The on_message callback parses the incoming JSON payload and stores the data in the database.
+main.py
+Initializes the FastAPI application.
+Sets up the database connection.
+Starts the OBDReader and MQTTClient in background threads on application startup.
+REST API Endpoint:
+GET /api/vehicles/{vehicle_id}/history: Returns historical data for a vehicle.
+WebSocket Endpoint:
+/ws: Streams live data from both OBD-II and MQTT sources to connected dashboard clients. It will pull the latest readings from the database or an in-memory cache.
+--------------------------------------------------------------------------------
+4. Phase 2: Wireless Sensor Node (ESP32)
+4.1. Hardware & Setup
+Hardware: ESP32-H2 DevKitC-1, breadboard, jumper wires, sensors (e.g., voltage sensor module for battery, DS18B20 for temperature).
+Software: Thonny IDE or VS Code with Pico-W-Go extension for MicroPython development.
+Flashing: Flash the latest stable MicroPython firmware for the ESP32.
+4.2. esp32/boot.py Implementation
+Wi-Fi Connection: Connects to the specified network SSID and password.
+MQTT Client Setup: Configures the MQTT client to connect to the Pi's IP address.
+Sensor Reading Loop:
+In an infinite loop, read values from the connected sensors (e.g., adc.read_u16() for analog sensors).
+Perform necessary conversions (e.g., map ADC value to voltage).
+Data Publishing:
+For each reading, construct a JSON payload: {"value": 48.5, "units": "V"}.
+Publish the payload to a specific MQTT topic, e.g., vehicles/golfcart/battery_voltage.
+Implement a sleep in the loop to control the publishing frequency (e.g., every 5 seconds).
+--------------------------------------------------------------------------------
+5. Phase 3: User Interface (Web Dashboard)
+5.1. static/index.html
+Basic HTML5 structure.
+Includes divs to act as containers for gauges, charts, and data readouts.
+Links to the CSS and JavaScript files.
+5.2. static/css/styles.css
+Basic styling for a clean, readable dashboard layout.
+Dark theme is preferred for garage/outdoor environments.
+5.3. static/js/app.js
+WebSocket Connection: Establishes a WebSocket connection to the FastAPI server (ws://<pi_ip_address>/ws).
+Data Handling: The onmessage event handler parses the incoming JSON data.
+UI Updates: Updates the content of the HTML elements (document.getElementById(...)) with the new data.
+Visualization: Uses a library like Chart.js or Gauge.js to render real-time data into graphical gauges and charts.
+--------------------------------------------------------------------------------
+6. Verification & Milestones
+Milestone 1 (Hub Ready): The FastAPI server runs, the database is created, and the obd_reader.py script successfully connects to the Toyota Solara and logs RPM data to the diagnostics.db file.
+Milestone 2 (Node Ready): The ESP32 successfully connects to Wi-Fi, reads a sensor value (even a dummy one), and publishes it to the MQTT broker. The message is visible using mosquitto_sub on the Pi.
+Milestone 3 (Full Integration): The main.py application receives data from both the OBD-II reader and the MQTT client and stores both in the database.
+Final Product (Dashboard Live): The web dashboard (index.html) successfully connects to the WebSocket and displays live, updating values from both the Toyota (OBD-II) and the golf cart (ESP32) simultaneously.
