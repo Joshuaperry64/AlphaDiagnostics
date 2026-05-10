@@ -1,3 +1,24 @@
+---
+THEME & USER INTENT
+A professional, high-tech AlphaDiagnostics system architecture diagram set against a dark, industrial charcoal-textured background. The aesthetic is "Futuristic Cyber-Automotive" with a modular grid layout. Features include: isometric 3D renders of the Raspberry Pi 5 central hub, ESP32 wireless sensor nodes, and vehicle ECU computer systems, glowing cyan data-flow lines, and a high-contrast "Safety Yellow" caution-tape border for a side panel labeled "PHASE 4-5: THE ADVANCED 'DEALER-LEVEL' EXPANSION." The UI elements show semi-transparent dark-mode dashboards with neon line graphs and circular telemetry gauges. Use clean, modern sans-serif typography, subtle blueprint grid overlays, and sharp, cinematic lighting. 8k resolution, technical schematic style, Unreal Engine 5 render aesthetic.
+
+User & Workflow Notes
+- Intended user: Advanced hobbyist/technician (the tool creator).
+- Advanced/dealer-level features are directly accessible from the main UI (no extra confirmation required).
+- Main workflow: Wireless connection between laptop and Raspberry Pi; most functions performed from the laptop.
+- Cloud-based AI integration (e.g., Gemini API, Copilot) is expected for advanced/agentic features.
+- No built-in safety interlocks, but warnings for risky procedures are present.
+
+---
+
+EXPANSION & AGENTIC WORKFLOW
+- New vehicles/sensors: Added via GUI-based workflow, with auto-detection as ideal.
+- If auto-detection/AI cannot fully support a new vehicle, the system logs and records all relevant data for later agentic analysis.
+- Universal compatibility is prioritized; simultaneous multi-vehicle display is not required.
+- Agentic features and AI integration are core to the expansion path.
+
+---
+
 Blueprint: Portable, Modular Vehicle Diagnostics Tool
 1. Project Vision
 To create a universal, portable, and modular vehicle diagnostics tool. The system will be capable of interfacing with both modern vehicles via the OBD-II standard and older or simpler vehicles (like a golf cart) through direct sensor connections. The architecture is designed for scalability, allowing for the addition of new vehicles and sensor types in the future.
@@ -127,3 +148,43 @@ Milestone 1 (Hub Ready): The FastAPI server runs, the database is created, and t
 Milestone 2 (Node Ready): The ESP32 successfully connects to Wi-Fi, reads a sensor value (even a dummy one), and publishes it to the MQTT broker. The message is visible using mosquitto_sub on the Pi.
 Milestone 3 (Full Integration): The main.py application receives data from both the OBD-II reader and the MQTT client and stores both in the database.
 Final Product (Dashboard Live): The web dashboard (index.html) successfully connects to the WebSocket and displays live, updating values from both the Toyota (OBD-II) and the golf cart (ESP32) simultaneously.
+
+---
+System Architecture & Platform Structure
+- Single repository with subfolders for Pi and Windows platforms.
+- Shared Python package (`alpha_common`) for protocol definitions, logging, and models; platform-specific extensions on the laptop.
+- Simple requirements.txt for dependencies (no virtualenvs).
+
+---
+Communication & Data Flow
+- Python used on both Pi and Windows; two interfaces communicate via REST API and/or WebSockets (FastAPI).
+- Pi is primary controller for OpenPort 2.0, but device can be moved to laptop if needed.
+- Pi pushes logs to laptop when reachable; laptop listens for incoming data. Use easiest transport (HTTP POST or SCP/SSH).
+
+---
+Prototype & MVP Features
+- Connection test, OBD diagnostics (VIN, DTCs, live sensor data), customizable features (e.g., door lock programming).
+- Extensive logging/session recording from the start (raw CAN/OBD messages, user actions, errors).
+
+---
+Configuration & Updates
+- Configuration managed on laptop, executed on Pi.
+- Firmware updates: Pi notifies and requires laptop connection to proceed.
+
+---
+Security & Access
+- Simple password authentication for dashboard/API; remote access from laptop supported.
+
+---
+Dashboard & UI
+- Configurable dashboard adapts to vehicle architecture; widgets/layouts are vehicle-specific.
+
+---
+Agentic/AI Features
+- AI can provide suggestions automatically, but all actions require user confirmation.
+
+---
+Unattended/Extended Operation
+- System optimized for unattended, extended operation: robust logging, automatic sync when laptop is available, minimal manual intervention required.
+
+---
